@@ -18,3 +18,8 @@ The screenshots come from RuneLite's own **Screenshot** plugin: turn it on and t
 is copied into the gallery (as a smaller JPEG) the moment it's taken. Older ones: click **Import**, then Open (on
 Windows, pick your `.runelite` folder first). The gallery only works with its own copies — your original screenshots
 are never changed or deleted — and it sends nothing anywhere.
+
+## Credits
+
+How a new screenshot is filed (its type and name, from the game event that made RuneLite take it) follows RuneLite's own
+Screenshot plugin (`ScreenshotPlugin`, Copyright (c) 2018, Lotto), used under RuneLite's BSD 2-Clause licence.

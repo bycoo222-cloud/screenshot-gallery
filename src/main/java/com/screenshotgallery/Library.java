@@ -119,42 +119,44 @@ final class Library
 	}
 
 	/**
-	 * Keeps a copy of a screenshot RuneLite just saved. {@code savedAt} is where RuneLite put it, used only as text:
-	 * the names after its "screenshots" folder are the character and the type (the file itself is never opened).
+	 * Keeps a copy of a screenshot RuneLite just saved, at {@code parts} ({@link #place}). A name already taken gets
+	 * "(1)", "(2)"... as RuneLite's own files do (several pictures in one second).
 	 */
-	void keep(String savedAt, BufferedImage img) throws IOException
+	void keep(List<String> parts, BufferedImage img) throws IOException
 	{
-		List<String> parts = under(savedAt);
 		if (parts.isEmpty() || img == null)
 		{
 			return;
 		}
 		Filepath out = target(parts);
+		String base = parts.get(parts.size() - 1).replaceFirst("(?i)\\.(png|jpe?g)$", "");
+		for (int i = 1; out.exists() && i < 1000; i++)
+		{
+			List<String> next = new ArrayList<>(parts);
+			next.set(next.size() - 1, base + "(" + i + ").png");
+			out = target(next);
+		}
 		out.getParent().createDirectories();
 		writeJpeg(img, out);
 	}
 
-	/** The names after the last "screenshots" folder in a path: [character, type..., file]; at most the last three. */
-	static List<String> under(String path)
+	/**
+	 * Where RuneLite filed a new screenshot, as [character, type, file name]: its character folder (null = none, then the
+	 * file alone), its type folder (none for a manual screenshot) and "&lt;name&gt; &lt;time&gt;.png".
+	 */
+	static List<String> place(String character, ShotNamer.Name name, long at)
 	{
-		List<String> all = new ArrayList<>();
-		for (String p : path.split("[/\\\\]+"))
+		List<String> out = new ArrayList<>();
+		if (character != null && !character.isEmpty())
 		{
-			if (!p.isEmpty())
+			out.add(character);
+			if (!name.manual())
 			{
-				all.add(p);
+				out.add(name.type);
 			}
 		}
-		int from = Math.max(0, all.size() - 3);
-		for (int i = all.size() - 2; i >= 0; i--)
-		{
-			if ("screenshots".equalsIgnoreCase(all.get(i)))
-			{
-				from = i + 1;
-				break;
-			}
-		}
-		return new ArrayList<>(all.subList(from, all.size()));
+		out.add(ShotNamer.fileName(name.file, at) + ".png");
+		return out;
 	}
 
 	/**

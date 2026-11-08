@@ -37,6 +37,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import javax.inject.Inject;
 import javax.swing.SwingUtilities;
 import net.runelite.api.ChatMessageType;
+import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.client.chat.ChatColorType;
@@ -44,6 +45,7 @@ import net.runelite.client.chat.ChatMessageBuilder;
 import net.runelite.client.chat.ChatMessageManager;
 import net.runelite.client.chat.QueuedMessage;
 import net.runelite.client.config.ConfigManager;
+import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.events.ScreenshotTaken;
@@ -78,6 +80,12 @@ public class ScreenshotGalleryPlugin extends Plugin
 	private ConfigManager configManager;
 
 	@Inject
+	private Client client;
+
+	@Inject
+	private EventBus eventBus;
+
+	@Inject
 	private ScreenshotGalleryConfig config;
 
 	@Inject
@@ -97,6 +105,9 @@ public class ScreenshotGalleryPlugin extends Plugin
 	private final AtomicBoolean scanQueued = new AtomicBoolean();
 	private volatile boolean importing;
 	private volatile boolean stopping;
+	/** what each new screenshot is of, from the game event that made RuneLite take it (not from its file) */
+	private volatile ShotNamer namer;
+	private ShotNamer.Watch watch;
 
 	@Override
 	protected void startUp() throws IOException
@@ -105,6 +116,9 @@ public class ScreenshotGalleryPlugin extends Plugin
 		library = new Library(getPluginDirectory().joinSegment("shots"));
 		albumsFile = getPluginDirectory().joinSegment("gallery.json");
 		stopping = false;
+		namer = new ShotNamer(ShotNamer.from(configManager));
+		watch = new ShotNamer.Watch(client, namer);
+		eventBus.register(watch);
 		// the plugin's own thread: reading and writing pictures never waits on, or holds up, the game or the sidebar
 		worker = Executors.newSingleThreadExecutor(r ->
 		{
@@ -126,6 +140,12 @@ public class ScreenshotGalleryPlugin extends Plugin
 	protected void shutDown()
 	{
 		// safe after a startUp that stopped part way (RuneLite stops a plugin whose start failed)
+		if (watch != null)
+		{
+			eventBus.unregister(watch);
+			watch = null;
+		}
+		namer = null;
 		if (navButton != null)
 		{
 			clientToolbar.removeNavigation(navButton);
@@ -174,22 +194,32 @@ public class ScreenshotGalleryPlugin extends Plugin
 		});
 	}
 
-	/** RuneLite saved a screenshot: the gallery keeps its own copy of it. */
+	/**
+	 * RuneLite saved a screenshot: the gallery keeps its own copy of it, filed under the character, the type and the name
+	 * RuneLite gave it — told from the game event that made RuneLite take it ({@link ShotNamer}), never from its file.
+	 */
 	@Subscribe
 	public void onScreenshotTaken(ScreenshotTaken e)
 	{
-		if (worker == null || worker.isShutdown() || e.getPath() == null)
+		ShotNamer n = namer;
+		ShotNamer.Watch w = watch;
+		if (n == null || w == null)
 		{
 			return;
 		}
-		// where RuneLite put it, as text only: the gallery files its copy under the same character and type
-		String savedAt = e.getPath().toString();
+		long now = System.currentTimeMillis();
+		ShotNamer.Name name = n.take(now);      // every screenshot takes its place in the queue, kept or not
 		BufferedImage img = e.getScreenshot();
+		if (worker == null || worker.isShutdown() || img == null)
+		{
+			return;
+		}
+		List<String> parts = Library.place(w.character(), name, now);
 		worker.execute(() ->
 		{
 			try
 			{
-				library.keep(savedAt, img);
+				library.keep(parts, img);
 			}
 			catch (IOException | RuntimeException ex)
 			{

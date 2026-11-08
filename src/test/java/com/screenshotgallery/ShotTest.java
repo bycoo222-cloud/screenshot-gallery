@@ -85,12 +85,18 @@ public class ShotTest
 	}
 
 	@Test
-	public void newScreenshotsFiledByTheirFolders()
+	public void newScreenshotsFiledAsRuneLiteFilesThem()
 	{
+		long at = LocalDateTime.of(2026, 11, 7, 12, 30, 45).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
 		assertEquals(Arrays.asList("Zezima", "Levels", "Fishing(99) 2026-11-07_12-30-45.png"),
-			Library.under("/home/x/.runelite/screenshots/Zezima/Levels/Fishing(99) 2026-11-07_12-30-45.png"));
+			Library.place("Zezima", new ShotNamer.Name("Levels", "Fishing(99)", at), at));
 		assertEquals(Arrays.asList("Zezima", "2026-11-07_12-30-45.png"),
-			Library.under("C:\\Users\\x\\.runelite\\screenshots\\Zezima\\2026-11-07_12-30-45.png"));
+			Library.place("Zezima", new ShotNamer.Name(null, "", at), at));
+		assertEquals(Arrays.asList("Fishing(99) 2026-11-07_12-30-45.png"), Library.place(null, new ShotNamer.Name("Levels", "Fishing(99)", at), at));
+		// the gallery reads its own copy back the way it always has
+		Shot s = shot("Zezima/Levels/Fishing(99) 2026-11-07_12-30-45.png");
+		assertEquals("Levels", s.type);
+		assertEquals("Fishing(99)", s.name);
 	}
 
 	@Test
