@@ -1,0 +1,15 @@
+.gradle
+build
+.idea/
+.project
+.settings/
+.classpath
+nbactions.xml
+nb-configuration.xml
+nbproject/
+*.class
+# personal dev launchers (paths on this PC)
+run-dev.sh
+stop-dev.sh
+# private working notes (measured/assumed log with personal data)
+NOTES.md
